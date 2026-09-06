@@ -41,3 +41,33 @@ stream:
 	-reducer Reducer.py \
 	-file Mapper.py -file Reducer.py \
 	-input input -output stream-output
+
+##
+## UrlCount -- Hadoop Streaming (Python) version
+##
+
+## Fetch the two Wikipedia articles into a LOCAL input/ directory
+## (no HDFS). Used by the `localtest` rule below.
+localprepare:
+	mkdir -p input
+	curl -sL https://en.wikipedia.org/wiki/Apache_Hadoop > input/file01
+	curl -sL https://en.wikipedia.org/wiki/MapReduce > input/file02
+
+## Simulate the whole Map/Reduce pipeline with Unix pipes -- `sort`
+## stands in for Hadoop's shuffle. No Hadoop or HDFS required, so
+## this is the fast edit-debug loop.
+localtest:
+	cat input/file01 input/file02 | python3 URLMapper.py | sort | python3 URLReducer.py
+
+## The real thing: run UrlCount on Hadoop via the streaming API.
+urlstream:
+	-hdfs dfs -rm -r url-output
+	hadoop jar $(STREAM_JAR) \
+	-mapper URLMapper.py \
+	-reducer URLReducer.py \
+	-file URLMapper.py -file URLReducer.py \
+	-input input -output url-output
+
+## Show the results after `make urlstream`
+urloutput:
+	hdfs dfs -cat url-output/part-*
